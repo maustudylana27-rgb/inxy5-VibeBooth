@@ -1,0 +1,522 @@
+<!-- ========================= -->
+<!-- index.html -->
+<!-- ========================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeBooth — AI Modern Photobooth</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- GSAP Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <!-- Font: Outfit (Modern AI Startup Look) -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #050505;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- Glassmorphism Utilities --- */
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .glass-heavy {
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- Neon Glows --- */
+        .glow-text {
+            text-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
+        }
+        
+        .btn-glow {
+            transition: all 0.3s ease;
+            box-shadow: 0 0 0 rgba(236, 72, 153, 0);
+        }
+        .btn-glow:hover {
+            box-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
+            transform: translateY(-2px);
+        }
+
+        /* --- Floating Particles Background --- */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(168, 85, 247, 0.4);
+            animation: floatUp linear infinite;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+        }
+
+        /* --- Camera Flash --- */
+        .flash-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* --- UI Elements --- */
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* --- Filters --- */
+        .filter-retro { filter: sepia(0.4) contrast(1.1) brightness(0.9) hue-rotate(-20deg); }
+        .filter-cyber { filter: hue-rotate(90deg) saturate(1.5) contrast(1.2) drop-shadow(0 0 5px #0ff); }
+        .filter-kawaii { filter: brightness(1.1) saturate(1.2) contrast(0.9); }
+        .filter-bw { filter: grayscale(1) contrast(1.5); }
+        .filter-dreamy { filter: brightness(1.2) contrast(0.8) blur(0.5px); }
+        .filter-anime { filter: saturate(1.4) contrast(1.1); }
+        .filter-vhs { filter: hue-rotate(180deg) saturate(0.8) blur(1px); }
+
+        /* --- Sticker Draggable --- */
+        .sticker {
+            cursor: grab;
+            position: absolute;
+            user-select: none;
+            z-index: 10;
+        }
+        .sticker:active { cursor: grabbing; }
+
+        /* --- Auth Modal --- */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 5, 5, 0.85);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 60;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .auth-card {
+            width: min(520px, 100%);
+            background: rgba(10, 10, 15, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 28px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+            padding: 36px;
+            position: relative;
+        }
+        .auth-card h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .auth-card p {
+            color: #c1c1d1;
+        }
+        .auth-input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            margin-top: 12px;
+            outline: none;
+        }
+        .auth-input::placeholder {
+            color: #888;
+        }
+        .auth-cta {
+            width: 100%;
+            padding: 16px 18px;
+            border-radius: 999px;
+            border: none;
+            background: linear-gradient(135deg, #9333ea, #ec4899);
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s ease;
+        }
+        .auth-cta:hover {
+            transform: translateY(-1px);
+        }
+        .auth-close {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+
+<!-- PARTICLES -->
+<div id="particleContainer" class="particles"></div>
+
+
+<!-- FLASH -->
+<div id="flashOverlay" class="flash-overlay"></div>
+
+
+<!-- SECTION 1: LANDING PAGE -->
+    <section id="landing" class="min-h-screen flex flex-col items-center justify-center relative px-4">
+        
+        <!-- Nav -->
+        <nav class="absolute top-0 w-full max-w-5xl mx-auto p-6 flex justify-between items-center z-20">
+            <div class="text-2xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-600">
+                VibeBooth
+            </div>
+            <div class="flex gap-4">
+                <button onclick="showAuth('login')" class="text-sm font-medium hover:text-purple-400 transition">Login</button>
+                <button onclick="showAuth('signup')" class="text-sm font-medium bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/10 transition">Sign Up</button>
+            </div>
+        </nav>
+
+        <!-- Hero -->
+        <div class="text-center z-10 mt-10">
+            <h1 class="text-6xl md:text-8xl font-black mb-2 tracking-tight">
+                CREATE YOUR <br>
+                <span class="glow-text text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">MEMORIES</span>
+            </h1>
+            <p class="text-gray-400 text-lg md:text-xl mb-10 font-light">Modern AI Powered Photobooth Experience</p>
+            <button onclick="startApp()" class="btn-glow group relative px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white font-bold text-xl overflow-hidden">
+                <span class="relative z-10">Start Session</span>
+            </button>
+        </div>
+
+        <!-- Floating Samples (Decor) -->
+        <div class="absolute bottom-10 flex gap-4 opacity-30 hover:opacity-60 transition duration-500">
+            <div class="w-16 h-24 bg-white rounded-lg transform -rotate-6 translate-y-4"></div>
+            <div class="w-16 h-24 bg-white rounded-lg transform rotate-3"></div>
+            <div class="w-16 h-24 bg-white rounded-lg transform -rotate-12 translate-y-8"></div>
+        </div>
+    </section>
+
+    <!-- AUTH MODAL -->
+    <div id="authModal" class="modal-overlay" onclick="closeAuth(event)">
+        <div class="auth-card glass" onclick="event.stopPropagation()">
+            <button class="auth-close" onclick="closeAuth(event)">✕</button>
+            <h2 id="authTitle">Login</h2>
+            <p id="authSubtitle">Sign in to start your VibeBooth session.</p>
+
+            <div class="mt-6">
+                <input id="authEmail" type="email" class="auth-input" placeholder="Email address" autocomplete="email">
+                <input id="authPassword" type="password" class="auth-input" placeholder="Password" autocomplete="current-password">
+            </div>
+
+            <button id="authSubmitBtn" class="auth-cta" onclick="submitAuth()">Continue</button>
+
+            <p class="text-sm text-gray-400 text-center mt-4">
+                <span id="authSwitchText">Don&#8217;t have an account?</span>
+                <button id="authSwitchBtn" type="button" class="text-cyan-300 underline" onclick="toggleAuthType()"></button>
+            </p>
+        </div>
+    </div>
+
+
+<!-- APP -->
+<section id="app" class="hidden app-layout">
+
+
+    <!-- LEFT -->
+    <div class="sidebar">
+
+
+        <div class="sidebar-title flex items-center justify-between">
+            <span>Photos</span>
+            <button onclick="backToCamera()" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full">Cameras</button>
+        </div>
+
+
+        <div
+        id="photoStripContainer"
+        class="photo-strip">
+
+        </div>
+
+    </div>
+
+
+
+    <!-- CENTER -->
+    <div class="main-editor center-camera">
+
+
+        <!-- CAMERA -->
+        <div
+        id="cameraContainer"
+        class="camera-container">
+
+
+            <video
+            id="cameraFeed"
+            autoplay
+            playsinline
+            class="camera-feed">
+            </video>
+
+
+            <canvas
+            id="drawingCanvas"
+            class="drawing-canvas">
+            </canvas>
+
+            <!-- GRID OVERLAY -->
+            <div id="gridOverlay" class="grid-overlay hidden"></div>
+
+
+            <div
+            id="countdown"
+            class="countdown">
+
+                3
+
+            </div>
+
+        </div>
+
+
+
+        <!-- CAMERA CONTROLS -->
+<div class="controls">
+    <div class="draw-control">
+        <button id="drawToggleBtn"
+            onclick="handleDrawToggleClick(event)"
+            onpointerdown="startDrawPaletteTimer()"
+            onpointerup="cancelDrawPaletteTimer()"
+            onpointercancel="cancelDrawPaletteTimer()"
+            onpointerleave="cancelDrawPaletteTimer()"
+            class="tool-btn"
+            title="Toggle drawing mode">
+            ✏️
+        </button>
+        <div id="drawPalette" class="draw-palette hidden" role="dialog" aria-label="Select draw color">
+            <button class="color-swatch" style="background:#ff4fd8;" onclick="pickDrawColor('#ff4fd8')"></button>
+            <button class="color-swatch" style="background:#34d399;" onclick="pickDrawColor('#34d399')"></button>
+            <button class="color-swatch" style="background:#60a5fa;" onclick="pickDrawColor('#60a5fa')"></button>
+            <button class="color-swatch" style="background:#facc15;" onclick="pickDrawColor('#facc15')"></button>
+            <button class="color-swatch" style="background:#f472b6;" onclick="pickDrawColor('#f472b6')"></button>
+            <button class="color-swatch" style="background:#ffffff; border:1px solid #ccc;" onclick="pickDrawColor('#ffffff')"></button>
+        </div>
+    </div>
+
+    <button onclick="clearDrawing()" class="tool-btn" title="Clear drawing">🧹</button>
+    <button onclick="convertDrawingToStickerButton()" class="tool-btn" title="Convert drawing to sticker">🖼️</button>
+
+    <button onclick="takeSinglePhoto()" class="camera-btn" title="Capture photo">
+        📸
+    </button>
+
+    <button onclick="flipCamera()" class="tool-btn" title="Flip camera">
+        🔄
+    </button>
+
+</div>
+</div>
+
+    <div class="right-panel sidebar">
+
+        <div class="sidebar-title">
+            Controls
+        </div>
+
+        <div class="controls-panel mb-6">
+            <div class="mb-3">
+                <div class="text-sm font-semibold">Timer</div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="setTimer(0)" class="timer-btn text-sm px-3 py-1 rounded-full bg-white/5">Off</button>
+                    <button onclick="setTimer(3)" class="timer-btn text-sm px-3 py-1 rounded-full bg-white/5">3s</button>
+                    <button onclick="setTimer(5)" class="timer-btn text-sm px-3 py-1 rounded-full bg-white/5">5s</button>
+                    <button onclick="setTimer(10)" class="timer-btn text-sm px-3 py-1 rounded-full bg-white/5">10s</button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <button id="flashToggleBtn" onclick="toggleFlash()" class="text-sm px-3 py-2 rounded-full bg-white/5">Flash: On</button>
+            </div>
+
+            <div class="mb-3">
+                <button id="gridToggleBtn" onclick="toggleGrid()" class="text-sm px-3 py-2 rounded-full bg-white/5">Grid: Off</button>
+            </div>
+
+            <div class="mb-3">
+                <button onclick="downloadAllPhotos()" class="text-sm px-3 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600">Download All</button>
+            </div>
+        </div>
+
+        <div class="sidebar-title mt">
+            Effects
+        </div>
+
+        <div class="effects-panel">
+            <button onclick="addSticker('🐱','cute-sticker')">
+                Cute Cat
+            </button>
+
+            <button onclick="addSticker('🎧','cute-sticker')">
+                Headset
+            </button>
+
+            <button onclick="addSticker('💖','cute-sticker')">
+                Heart
+            </button>
+
+            <button onclick="addSticker('⭐','cute-sticker')">
+                Star
+            </button>
+        </div>
+
+        <div class="sidebar-title">
+            Filters
+        </div>
+
+        <div class="filters">
+            <button onclick="applyFilter('')">
+                Natural
+            </button>
+
+            <button onclick="applyFilter('filter-retro')">
+                Retro
+            </button>
+
+            <button onclick="applyFilter('filter-cyber')">
+                Cyber
+            </button>
+
+            <button onclick="applyFilter('filter-kawaii')">
+                Kawaii
+            </button>
+
+            <button onclick="applyFilter('filter-bw')">
+                B&W
+            </button>
+
+            <button onclick="applyFilter('filter-dreamy')">
+                Dreamy
+            </button>
+
+            <button onclick="applyFilter('filter-anime')">
+                Anime
+            </button>
+
+            <button onclick="applyFilter('filter-vhs')">
+                VHS
+            </button>
+        </div>
+
+        <div class="sidebar-title mt">
+            Background
+        </div>
+
+        <div class="backgrounds">
+            <button class="background-btn" data-bg="bg1" title="Sunset" onclick="changeBackground('bg1')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #ff9a9e, #fad0c4);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg2" title="Ocean" onclick="changeBackground('bg2')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #00c6ff, #0072ff);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg3" title="Purple Haze" onclick="changeBackground('bg3')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #8e2de2, #4a00e0);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg4" title="Golden" onclick="changeBackground('bg4')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #f7971e, #ffd200);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg5" title="Green" onclick="changeBackground('bg5')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #56ab2f, #a8e063);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg6" title="Crimson" onclick="changeBackground('bg6')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #cb2d3e, #ef473a);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg7" title="Blue Sky" onclick="changeBackground('bg7')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #2193b0, #6dd5ed);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg8" title="Neutral" onclick="changeBackground('bg8')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #ffffff, #cccccc);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg9" title="Lavender" onclick="changeBackground('bg9')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #c084fc, #f5d0fe);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg10" title="Mint" onclick="changeBackground('bg10')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #34d399, #a7f3d0);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg11" title="Sunrise" onclick="changeBackground('bg11')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #fb7185, #fef3c7);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg12" title="Storm" onclick="changeBackground('bg12')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #0f172a, #334155);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg13" title="Neon" onclick="changeBackground('bg13')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #facc15, #f43f5e);"></span>
+            </button>
+
+            <button class="background-btn" data-bg="bg14" title="Galaxy" onclick="changeBackground('bg14')">
+                <span class="background-thumb" style="background: linear-gradient(to bottom, #0d9488, #1e3a8a);"></span>
+            </button>
+        </div>
+
+    </div>
+
+</section>
+
+
+<script src="storage.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
