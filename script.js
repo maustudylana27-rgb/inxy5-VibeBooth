@@ -347,7 +347,8 @@ const FILTER_STYLES = {
     "filter-bw": "grayscale(1) contrast(1.5)",
     "filter-dreamy": "brightness(1.2) contrast(0.8) blur(0.5px)",
     "filter-anime": "saturate(1.4) contrast(1.1)",
-    "filter-vhs": "hue-rotate(180deg) saturate(0.8) blur(1px)"
+    "filter-vhs": "hue-rotate(180deg) saturate(0.8) blur(1px)",
+    "filter-absurd": "contrast(2.0) saturate(1.5) blur(3px)",
 };
 
 function applyFilter(filterClass) {
