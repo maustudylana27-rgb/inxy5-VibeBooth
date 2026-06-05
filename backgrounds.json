@@ -1,0 +1,28 @@
+{
+    "backgrounds": [
+        {
+            "id": "bg_0",
+            "name": "Coll Vintage",
+            "path": "background.png/coll vintage.png",
+            "thumbnail": "background.png/coll vintage.png"
+        },
+        {
+            "id": "bg_1",
+            "name": "Cream Sweety",
+            "path": "background.png/cream sweety.png",
+            "thumbnail": "background.png/cream sweety.png"
+        },
+        {
+            "id": "bg_2",
+            "name": "Vintage Europ",
+            "path": "background.png/vintage europ.png",
+            "thumbnail": "background.png/vintage europ.png"
+        },
+        {
+            "id": "bg_3",
+            "name": "Vintage Sweety",
+            "path": "background.png/vintage sweety.png",
+            "thumbnail": "background.png/vintage sweety.png"
+        }
+    ]
+}

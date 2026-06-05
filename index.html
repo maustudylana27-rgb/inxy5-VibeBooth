@@ -9,6 +9,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VibeBooth — AI Modern Photobooth</title>
 
+    <!-- App icon -->
+    <link rel="icon" type="image/png" sizes="512x512" href="VBicon.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="VBicon.png">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -48,76 +52,6 @@
         }
 
         /* --- Neon Glows --- */
-        .glow-text {
-            text-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
-        }
-        
-        .btn-glow {
-            transition: all 0.3s ease;
-            box-shadow: 0 0 0 rgba(236, 72, 153, 0);
-        }
-        .btn-glow:hover {
-            box-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
-            transform: translateY(-2px);
-        }
-
-        /* --- Floating Particles Background --- */
-        .particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            overflow: hidden;
-            pointer-events: none;
-        }
-        .particle {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(168, 85, 247, 0.4);
-            animation: floatUp linear infinite;
-        }
-
-        @keyframes floatUp {
-            0% { transform: translateY(100vh) scale(0); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
-        }
-
-        /* --- Camera Flash --- */
-        .flash-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: white;
-            opacity: 0;
-            pointer-events: none;
-            z-index: 50;
-        }
-
-        /* --- UI Elements --- */
-        .scroll-hide::-webkit-scrollbar { display: none; }
-        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* --- Filters --- */
-        .filter-retro { filter: sepia(0.4) contrast(1.1) brightness(0.9) hue-rotate(-20deg); }
-        .filter-cyber { filter: hue-rotate(90deg) saturate(1.5) contrast(1.2) drop-shadow(0 0 5px #0ff); }
-        .filter-kawaii { filter: brightness(1.1) saturate(1.2) contrast(0.9); }
-        .filter-bw { filter: grayscale(1) contrast(1.5); }
-        .filter-dreamy { filter: brightness(1.2) contrast(0.8) blur(0.5px); }
-        .filter-anime { filter: saturate(1.4) contrast(1.1); }
-        .filter-vhs { filter: hue-rotate(180deg) saturate(0.8) blur(1px); }
-
-        /* --- Sticker Draggable --- */
-        .sticker {
-            cursor: grab;
-            position: absolute;
-            user-select: none;
-            z-index: 10;
-        }
-        .sticker:active { cursor: grabbing; }
-
-        /* --- Auth Modal --- */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -191,8 +125,7 @@
     </style>
 </head>
 
-<body>
-
+<body>    
 
 <!-- PARTICLES -->
 <div id="particleContainer" class="particles"></div>
@@ -211,8 +144,8 @@
                 VibeBooth
             </div>
             <div class="flex gap-4">
-                <button onclick="showAuth('login')" class="text-sm font-medium hover:text-purple-400 transition">Login</button>
-                <button onclick="showAuth('signup')" class="text-sm font-medium bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/10 transition">Sign Up</button>
+                <button onclick="window.location.href='login.html'" class="text-sm font-medium hover:text-purple-400 transition">Login</button>
+                <button onclick="window.location.href='login.html?mode=signup'" class="text-sm font-medium bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/10 transition">Sign Up</button>
             </div>
         </nav>
 
@@ -236,30 +169,8 @@
         </div>
     </section>
 
-    <!-- AUTH MODAL -->
-    <div id="authModal" class="modal-overlay" onclick="closeAuth(event)">
-        <div class="auth-card glass" onclick="event.stopPropagation()">
-            <button class="auth-close" onclick="closeAuth(event)">✕</button>
-            <h2 id="authTitle">Login</h2>
-            <p id="authSubtitle">Sign in to start your VibeBooth session.</p>
-
-            <div class="mt-6">
-                <input id="authEmail" type="email" class="auth-input" placeholder="Email address" autocomplete="email">
-                <input id="authPassword" type="password" class="auth-input" placeholder="Password" autocomplete="current-password">
-            </div>
-
-            <button id="authSubmitBtn" class="auth-cta" onclick="submitAuth()">Continue</button>
-
-            <p class="text-sm text-gray-400 text-center mt-4">
-                <span id="authSwitchText">Don&#8217;t have an account?</span>
-                <button id="authSwitchBtn" type="button" class="text-cyan-300 underline" onclick="toggleAuthType()"></button>
-            </p>
-        </div>
-    </div>
-
-
-<!-- APP -->
-<section id="app" class="hidden app-layout">
+    <!-- APP -->
+    <section id="app" class="hidden app-layout">
 
 
     <!-- LEFT -->
@@ -417,6 +328,14 @@
                 beautyfully🌟
             </button>
 
+            <button onclick="addSticker('☆*: .｡. o(≧▽≦)o .｡.:*☆','cute-sticker')">
+                ☆*: .｡. o(≧▽≦)o .｡.:*☆
+            </button>
+
+            <button onclick="addSticker('♨︎♨︎♨︎♨︎♨︎♨︎♨︎','cute-sticker')">
+                ♨︎♨︎♨︎♨︎♨︎♨︎♨︎
+            </button>
+
         </div>
 
         <div class="sidebar-title">
@@ -433,7 +352,7 @@
             </button>
 
             <button onclick="applyFilter('filter-cyber')">
-                Cyber
+                Cyber.
             </button>
 
             <button onclick="applyFilter('filter-kawaii')">
@@ -465,62 +384,8 @@
             Background
         </div>
 
-        <div class="backgrounds">
-            <button class="background-btn" data-bg="bg1" title="Sunset" onclick="changeBackground('bg1')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #ff9a9e, #fad0c4);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg2" title="Ocean" onclick="changeBackground('bg2')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #00c6ff, #0072ff);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg3" title="Purple Haze" onclick="changeBackground('bg3')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #8e2de2, #4a00e0);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg4" title="Golden" onclick="changeBackground('bg4')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #f7971e, #ffd200);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg5" title="Green" onclick="changeBackground('bg5')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #56ab2f, #a8e063);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg6" title="Crimson" onclick="changeBackground('bg6')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #cb2d3e, #ef473a);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg7" title="Blue Sky" onclick="changeBackground('bg7')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #2193b0, #6dd5ed);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg8" title="Neutral" onclick="changeBackground('bg8')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #ffffff, #cccccc);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg9" title="Lavender" onclick="changeBackground('bg9')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #c084fc, #f5d0fe);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg10" title="Mint" onclick="changeBackground('bg10')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #34d399, #a7f3d0);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg11" title="Sunrise" onclick="changeBackground('bg11')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #fb7185, #fef3c7);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg12" title="Storm" onclick="changeBackground('bg12')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #0f172a, #334155);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg13" title="Neon" onclick="changeBackground('bg13')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #facc15, #f43f5e);"></span>
-            </button>
-
-            <button class="background-btn" data-bg="bg14" title="Galaxy" onclick="changeBackground('bg14')">
-                <span class="background-thumb" style="background: linear-gradient(to bottom, #0d9488, #1e3a8a);"></span>
-            </button>
+        <div id="backgroundsContainer" class="backgrounds">
+            <!-- Backgrounds will be loaded dynamically from folder -->
         </div>
 
     </div>

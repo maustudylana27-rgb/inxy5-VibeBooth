@@ -4,9 +4,14 @@
 
 let selectedPhotoIndex = null;
 let currentFilterClass = "";
-let currentBackground = "bg1";
+let currentBackground = null;
+let currentBackgroundImage = null;
+let availableBackgrounds = [];
+let transparentAreas = []; // Store detected transparent areas
+let currentCaptureAreaIndex = 0;
+let isCapturing = false;
 
-const MAX_PHOTOS = 7;
+let MAX_PHOTOS = 7;
 
 const landing = document.getElementById("landing");
 const app = document.getElementById("app");
@@ -45,15 +50,6 @@ let drawLongPress = false;
 drawingCanvas.style.pointerEvents = "none";
 
 let currentUser = getCurrentUser ? getCurrentUser() : null;
-let currentAuthType = "login";
-const authModal = document.getElementById("authModal");
-const authTitle = document.getElementById("authTitle");
-const authSubtitle = document.getElementById("authSubtitle");
-const authSubmitBtn = document.getElementById("authSubmitBtn");
-const authSwitchText = document.getElementById("authSwitchText");
-const authSwitchBtn = document.getElementById("authSwitchBtn");
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
 
 // ============================
 // PHOTBOOTH SETTINGS
@@ -109,25 +105,142 @@ function downloadAllPhotos(){
     });
 }
 
-function getBackgroundGradientColors(bg) {
-    const gradients = {
-        bg1: ['#ff9a9e', '#fad0c4'],
-        bg2: ['#00c6ff', '#0072ff'],
-        bg3: ['#8e2de2', '#4a00e0'],
-        bg4: ['#f7971e', '#ffd200'],
-        bg5: ['#56ab2f', '#a8e063'],
-        bg6: ['#cb2d3e', '#ef473a'],
-        bg7: ['#2193b0', '#6dd5ed'],
-        bg8: ['#ffffff', '#cccccc'],
-        bg9: ['#c084fc', '#f5d0fe'],
-        bg10: ['#34d399', '#a7f3d0'],
-        bg11: ['#fb7185', '#fef3c7'],
-        bg12: ['#0f172a', '#334155'],
-        bg13: ['#facc15', '#f43f5e'],
-        bg14: ['#0d9488', '#1e3a8a']
-    };
+// Load backgrounds from JSON
+async function loadAvailableBackgrounds() {
+    try {
+        const response = await fetch('backgrounds.json');
+        const data = await response.json();
+        if (data.backgrounds && data.backgrounds.length > 0) {
+            availableBackgrounds = data.backgrounds;
+            renderBackgroundButtons();
+            // Set first background as default
+            if (availableBackgrounds.length > 0) {
+                changeBackground(availableBackgrounds[0].id);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading backgrounds:', error);
+    }
+}
 
-    return gradients[bg] || gradients.bg1;
+// Get background by ID
+function getBackgroundById(id) {
+    return availableBackgrounds.find(bg => bg.id === id);
+}
+
+// Detect transparent areas from background image
+async function detectTransparentAreas(imagePath) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const transparentPixels = [];
+            
+            // Find all transparent pixels
+            for (let i = 3; i < data.length; i += 4) {
+                const alpha = data[i];
+                if (alpha < 128) {
+                    const pixelIndex = (i - 3) / 4;
+                    const x = pixelIndex % canvas.width;
+                    const y = Math.floor(pixelIndex / canvas.width);
+                    transparentPixels.push({ x, y });
+                }
+            }
+            
+            // Group transparent pixels into clusters (areas)
+            const areas = clusterTransparentPixels(transparentPixels, canvas.width, canvas.height);
+            resolve(areas);
+        };
+        img.onerror = () => {
+            console.error('Failed to load background image for analysis');
+            resolve([]);
+        };
+        img.src = imagePath;
+    });
+}
+
+// Cluster transparent pixels into separate areas
+function clusterTransparentPixels(pixels, imgWidth, imgHeight) {
+    if (pixels.length === 0) return [];
+    
+    const visited = new Set();
+    const clusters = [];
+    
+    for (const pixel of pixels) {
+        const key = `${pixel.x},${pixel.y}`;
+        if (visited.has(key)) continue;
+        
+        const cluster = floodFill(pixels, pixel, visited, imgWidth, imgHeight);
+        if (cluster.length > 100) { // Only consider clusters with significant size
+            clusters.push(cluster);
+        }
+    }
+    
+    // Convert clusters to bounding boxes
+    const boundingBoxes = clusters.map(cluster => {
+        const xs = cluster.map(p => p.x);
+        const ys = cluster.map(p => p.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        
+        return {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
+            centerX: (minX + maxX) / 2,
+            centerY: (minY + maxY) / 2
+        };
+    });
+    
+    return boundingBoxes;
+}
+
+// Simple flood fill to find connected transparent pixels
+function floodFill(allPixels, startPixel, visited, width, height) {
+    const cluster = [];
+    const queue = [startPixel];
+    const pixelMap = new Map();
+    
+    for (const pixel of allPixels) {
+        pixelMap.set(`${pixel.x},${pixel.y}`, pixel);
+    }
+    
+    while (queue.length > 0) {
+        const pixel = queue.shift();
+        const key = `${pixel.x},${pixel.y}`;
+        
+        if (visited.has(key)) continue;
+        visited.add(key);
+        cluster.push(pixel);
+        
+        // Check neighbors
+        const neighbors = [
+            { x: pixel.x + 1, y: pixel.y },
+            { x: pixel.x - 1, y: pixel.y },
+            { x: pixel.x, y: pixel.y + 1 },
+            { x: pixel.x, y: pixel.y - 1 }
+        ];
+        
+        for (const neighbor of neighbors) {
+            const nKey = `${neighbor.x},${neighbor.y}`;
+            if (!visited.has(nKey) && pixelMap.has(nKey)) {
+                queue.push(neighbor);
+            }
+        }
+    }
+    
+    return cluster;
 }
 
 function loadImage(url) {
@@ -141,7 +254,7 @@ function loadImage(url) {
 
 async function createMergedPhoto() {
     const images = await Promise.all(capturedPhotos.map(src => loadImage(src)));
-    const cols = Math.min(3, images.length);
+    const cols = 1;
     const rows = Math.ceil(images.length / cols);
     const firstImage = images[0];
     const targetCellWidth = Math.min(900, firstImage.naturalWidth || 800);
@@ -150,13 +263,8 @@ async function createMergedPhoto() {
     canvas.width = cols * targetCellWidth;
     canvas.height = rows * targetCellHeight;
     const ctx = canvas.getContext('2d');
-    const [startColor, endColor] = getBackgroundGradientColors(currentBackground);
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, startColor);
-    gradient.addColorStop(1, endColor);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    
+    // Photos already contain background from capture process, so draw them directly
     images.forEach((img, index) => {
         const x = (index % cols) * targetCellWidth;
         const y = Math.floor(index / cols) * targetCellHeight;
@@ -175,102 +283,20 @@ function validateEmail(email) {
     return emailRegex.test(email);
 }
 
-// ============================
-// AUTH
-// ============================
-
-function showAuth(type) {
-
-    currentAuthType = type;
-
-    if (!authModal) return;
-
-    authModal.classList.add("active");
-
-    if (type === "signup") {
-        authTitle.innerText = "Create your account";
-        authSubtitle.innerText = "Sign up and begin your VibeBooth journey.";
-        authSubmitBtn.innerText = "Sign Up";
-        authSwitchText.innerText = "Already have an account?";
-        authSwitchBtn.innerText = "Login";
-    } else {
-        authTitle.innerText = "Welcome back";
-        authSubtitle.innerText = "Login to access your VibeBooth session.";
-        authSubmitBtn.innerText = "Login";
-        authSwitchText.innerText = "Don't have an account?";
-        authSwitchBtn.innerText = "Sign Up";
-    }
-
-    authEmail.value = "";
-    authPassword.value = "";
+// Initialize drawing canvas with proper dimensions after container is ready
+function initializeDrawingCanvas() {
+    if (!cameraContainer) return;
+    const rect = cameraContainer.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    
+    // Set canvas to match container dimensions (now square)
+    drawingCanvas.width = Math.round(rect.width);
+    drawingCanvas.height = Math.round(rect.height);
+    drawingCanvas.style.width = '100%';
+    drawingCanvas.style.height = '100%';
 }
 
-function toggleAuthType() {
-    showAuth(currentAuthType === "login" ? "signup" : "login");
-}
-
-function closeAuth(event) {
-    if (event && event.target !== event.currentTarget) return;
-    if (!authModal) return;
-    authModal.classList.remove("active");
-}
-
-function submitAuth() {
-    const email = authEmail.value.trim();
-    const password = authPassword.value.trim();
-
-    if (!validateEmail(email)) {
-        alert("Please enter a valid email address.");
-        return;
-    }
-
-    if (password.length < 6) {
-        alert("Password must be at least 6 characters long.");
-        return;
-    }
-
-    const accounts = getStoredAccounts();
-
-    if (currentAuthType === "signup") {
-        if (accounts[email]) {
-            alert("This email is already registered. Please log in instead.");
-            return;
-        }
-
-        accounts[email] = { password };
-        saveStoredAccounts(accounts);
-        setCurrentUser(email);
-        currentUser = email;
-
-        alert("Sign up successful! Welcome to VibeBooth.");
-        closeAuth();
-        startApp();
-        return;
-    }
-
-    if (!accounts[email]) {
-        alert("No account found with this email. Please sign up first.");
-        return;
-    }
-
-    if (accounts[email].password !== password) {
-        alert("Incorrect password. Please try again.");
-        return;
-    }
-
-    setCurrentUser(email);
-    currentUser = email;
-
-    alert("Login successful! Redirecting to VibeBooth.");
-    closeAuth();
-    startApp();
-}
-
-
-// ============================
-// START APP
-// ============================
-
+// Call on app start
 function startApp(mode) {
 
     landing.classList.add("hidden");
@@ -283,11 +309,16 @@ function startApp(mode) {
         duration: 1
     });
 
+    initializeDrawingCanvas();
     startCamera();
     resizeDrawingCanvas();
 
-    // set a default pleasant background for photobooth
-    changeBackground('bg1');
+    // Load backgrounds from JSON
+    loadAvailableBackgrounds();
+
+    // Ensure capture is enabled when app starts
+    const captureButton = document.querySelector('.camera-btn');
+    if (captureButton) captureButton.disabled = false;
 }
 
 function resizeDrawingCanvas() {
@@ -306,6 +337,11 @@ function resizeDrawingCanvas() {
     drawingCanvas.style.width = '100%';
     drawingCanvas.style.height = '100%';
     ctx.drawImage(tempCanvas, 0, 0, drawingCanvas.width, drawingCanvas.height);
+    
+    // Reposition video when resizing
+    if (transparentAreas.length > 0) {
+        positionVideoInTransparentArea(0);
+    }
 }
 
 
@@ -348,7 +384,8 @@ const FILTER_STYLES = {
     "filter-dreamy": "brightness(1.2) contrast(0.8) blur(0.5px)",
     "filter-anime": "saturate(1.4) contrast(1.1)",
     "filter-vhs": "hue-rotate(180deg) saturate(0.8) blur(1px)",
-    "filter-absurd": "contrast(2.0) saturate(1.5) blur(3px)",
+    "filter-absurd": "contrast(2.0) saturate(1.5) blur(10px)",
+
 };
 
 function applyFilter(filterClass) {
@@ -420,11 +457,13 @@ function runCountdown(seconds) {
         let count = seconds;
         countdown.innerText = count;
         countdown.style.opacity = '1';
+        countdown.style.visibility = 'visible';
         const interval = setInterval(() => {
             count -= 1;
             if (count <= 0) {
                 clearInterval(interval);
                 countdown.style.opacity = '0';
+                countdown.style.visibility = 'hidden';
                 resolve();
                 return;
             }
@@ -439,6 +478,10 @@ function runCountdown(seconds) {
 // ============================
 
 async function takeSinglePhoto() {
+    if (isCapturing) {
+        return;
+    }
+
     if(capturedPhotos.length >= MAX_PHOTOS) {
         alert(
             "Maaf sesi potret photo anda telah max. Hapus salah satu atau ulangi photo untuk melanjutkan 😭"
@@ -446,35 +489,148 @@ async function takeSinglePhoto() {
         return;
     }
 
-    if(timerSeconds && timerSeconds > 0) {
-        await runCountdown(timerSeconds);
-        if(flashEnabled) flashEffect();
-        takePhoto();
-    } else {
-        if(flashEnabled) flashEffect();
-        takePhoto();
+    isCapturing = true;
+    const captureButton = document.querySelector('.camera-btn');
+    if (captureButton) captureButton.disabled = true;
+
+    try {
+        if(timerSeconds && timerSeconds > 0) {
+            await runCountdown(timerSeconds);
+            if(flashEnabled) flashEffect();
+            await takePhoto();
+        } else {
+            if(flashEnabled) flashEffect();
+            await takePhoto();
+        }
+    } finally {
+        isCapturing = false;
+        if (captureButton) captureButton.disabled = false;
     }
 }
 
 function takePhoto() {
-    const captureCanvas = document.createElement("canvas");
-    const captureCtx = captureCanvas.getContext("2d");
+    return new Promise((resolve, reject) => {
+        const captureCanvas = document.createElement("canvas");
+        const captureCtx = captureCanvas.getContext("2d");
 
-    captureCanvas.width = video.videoWidth || cameraContainer.clientWidth;
-    captureCanvas.height = video.videoHeight || cameraContainer.clientHeight;
+        // Use container dimensions to match display exactly
+        const containerRect = cameraContainer.getBoundingClientRect();
+        const size = Math.round(containerRect.width);
+        
+        captureCanvas.width = size;
+        captureCanvas.height = size;
 
-    if (captureCanvas.width === 0 || captureCanvas.height === 0) {
-        alert('Kamera belum siap, coba lagi sebentar.');
-        return;
-    }
+        if (captureCanvas.width === 0 || captureCanvas.height === 0) {
+            alert('Kamera belum siap, coba lagi sebentar.');
+            reject(new Error('Camera not ready'));
+            return;
+        }
 
-    captureCtx.filter = FILTER_STYLES[currentFilterClass] || getComputedStyle(video).filter || "none";
-    captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+        // Draw background image first
+        if (currentBackgroundImage) {
+            const bgImg = new Image();
+            bgImg.onload = () => {
+                // Draw background with proper scaling
+                captureCtx.drawImage(bgImg, 0, 0, size, size);
+                
+                // Draw video and other elements on top
+                drawVideoAndElements(captureCanvas, captureCtx, size).then(resolve).catch(reject);
+            };
+            bgImg.onerror = reject;
+            bgImg.src = currentBackgroundImage;
+        } else {
+            drawVideoAndElements(captureCanvas, captureCtx, size).then(resolve).catch(reject);
+        }
+    });
+}
 
+function drawVideoAndElements(captureCanvas, captureCtx, size) {
+    return new Promise((resolve, reject) => {
+        const containerRect = cameraContainer.getBoundingClientRect();
+        
+        captureCtx.filter = FILTER_STYLES[currentFilterClass] || getComputedStyle(video).filter || "none";
+        
+        // Draw video from transparent area
+        if (transparentAreas.length > 0) {
+            const area = transparentAreas[currentCaptureAreaIndex] || transparentAreas[0];
+            
+            // Get background image dimensions
+            const bgImg = new Image();
+            bgImg.onload = () => {
+                const imgAspect = bgImg.naturalWidth / bgImg.naturalHeight;
+                const containerAspect = size / size;
+                
+                let scaleX, scaleY, offsetX = 0, offsetY = 0;
+                
+                if (imgAspect > containerAspect) {
+                    scaleY = size / bgImg.naturalHeight;
+                    scaleX = scaleY;
+                    offsetX = (size - bgImg.naturalWidth * scaleX) / 2;
+                } else {
+                    scaleX = size / bgImg.naturalWidth;
+                    scaleY = scaleX;
+                    offsetY = (size - bgImg.naturalHeight * scaleY) / 2;
+                }
+                
+                // Calculate video position and size in canvas
+                const videoX = area.x * scaleX + offsetX;
+                const videoY = area.y * scaleY + offsetY;
+                const videoWidth = area.width * scaleX;
+                const videoHeight = area.height * scaleY;
+                
+                // Draw video with flip
+                captureCtx.save();
+                captureCtx.translate(videoX + videoWidth, videoY);
+                captureCtx.scale(-1, 1);
+                captureCtx.drawImage(video, 0, 0, videoWidth, videoHeight);
+                captureCtx.restore();
+                
+                // Draw drawing canvas overlay
+                if (drawingCanvas.width > 0 && drawingCanvas.height > 0) {
+                    captureCtx.drawImage(drawingCanvas, videoX, videoY, videoWidth, videoHeight);
+                }
+                
+                // Draw stickers
+                drawStickersOnCapture(captureCanvas, captureCtx, containerRect, size);
+                
+                finalizeCapturedPhoto(captureCanvas);
+                resolve();
+            };
+            bgImg.onerror = reject;
+            bgImg.src = currentBackgroundImage;
+        } else {
+            // Fallback: draw video normally without background
+            const videoAspect = video.videoWidth / video.videoHeight;
+            let drawWidth = size;
+            let drawHeight = size;
+            let drawX = 0;
+            let drawY = 0;
+            
+            if (videoAspect > 1) {
+                drawHeight = Math.round(size / videoAspect);
+                drawY = (size - drawHeight) / 2;
+            } else {
+                drawWidth = Math.round(size * videoAspect);
+                drawX = (size - drawWidth) / 2;
+            }
+            
+            captureCtx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+            
+            if (drawingCanvas.width > 0 && drawingCanvas.height > 0) {
+                captureCtx.drawImage(drawingCanvas, 0, 0, size, size);
+            }
+            
+            drawStickersOnCapture(captureCanvas, captureCtx, cameraContainer.getBoundingClientRect(), size);
+            finalizeCapturedPhoto(captureCanvas);
+            resolve();
+        }
+    });
+}
+
+function drawStickersOnCapture(captureCanvas, captureCtx, containerRect, size) {
     const wrapperElements = cameraContainer.querySelectorAll('.sticker-wrapper');
-    const containerRect = cameraContainer.getBoundingClientRect();
-    const scaleX = captureCanvas.width / containerRect.width;
-    const scaleY = captureCanvas.height / containerRect.height;
+    const scaleX = 1;
+    const scaleY = 1;
 
     wrapperElements.forEach((wrapper) => {
         if (wrapper.dataset.include === 'false') return;
@@ -505,14 +661,23 @@ function takePhoto() {
         }
         captureCtx.restore();
     });
+}
 
-    if (drawingCanvas.width > 0 && drawingCanvas.height > 0) {
-        captureCtx.drawImage(drawingCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
-    }
-
+function finalizeCapturedPhoto(captureCanvas) {
     const image = captureCanvas.toDataURL("image/png");
     capturedPhotos.push(image);
     renderPhotoStrip();
+
+    // Advance to next transparent capture area
+    currentCaptureAreaIndex = Math.min(capturedPhotos.length, transparentAreas.length - 1);
+    if (transparentAreas.length > 0) {
+        positionVideoInTransparentArea(currentCaptureAreaIndex);
+    }
+
+    const captureButton = document.querySelector('.camera-btn');
+    if (captureButton) {
+        captureButton.disabled = capturedPhotos.length >= MAX_PHOTOS;
+    }
 }
 
 function createStickerWrapper(content) {
@@ -857,75 +1022,135 @@ function backToCamera() {
 // CHANGE BACKGROUND
 // ============================
 
-function changeBackground(bg) {
-
-    const backgrounds = {
-
-        bg1:
-        "linear-gradient(to bottom, #ff9a9e, #fad0c4)",
-
-        bg2:
-        "linear-gradient(to bottom, #00c6ff, #0072ff)",
-
-        bg3:
-        "linear-gradient(to bottom, #8e2de2, #4a00e0)",
-
-        bg4:
-        "linear-gradient(to bottom, #f7971e, #ffd200)",
-
-        bg5:
-        "linear-gradient(to bottom, #56ab2f, #a8e063)",
-
-        bg6:
-        "linear-gradient(to bottom, #cb2d3e, #ef473a)",
-
-        bg7:
-        "linear-gradient(to bottom, #2193b0, #6dd5ed)",
-
-        bg8:
-        "linear-gradient(to bottom, #ffffff, #cccccc)",
-
-        bg9:
-        "linear-gradient(to bottom, #c084fc, #f5d0fe)",
-
-        bg10:
-        "linear-gradient(to bottom, #34d399, #a7f3d0)",
-
-        bg11:
-        "linear-gradient(to bottom, #fb7185, #fef3c7)",
-
-        bg12:
-        "linear-gradient(to bottom, #0f172a, #334155)",
-
-        bg13:
-        "linear-gradient(to bottom, #facc15, #f43f5e)",
-
-        bg14:
-        "linear-gradient(to bottom, #0d9488, #1e3a8a)"
-    };
-
-    currentBackground = bg;
-
-    const selectedBackground = backgrounds[bg] || backgrounds.bg1;
-
-    cameraContainer.style.background = selectedBackground;
-
-    const photoStrip = document.getElementById('photoStripContainer');
-    if(photoStrip) {
-        photoStrip.style.backgroundImage = `${selectedBackground}, linear-gradient(rgba(0,0,0,0.22), rgba(0,0,0,0.22))`;
-        photoStrip.style.backgroundBlendMode = 'overlay';
+async function changeBackground(bgId) {
+    currentBackground = bgId;
+    const background = getBackgroundById(bgId);
+    
+    if (background) {
+        currentBackgroundImage = background.path;
+        
+        // Detect transparent areas
+        transparentAreas = await detectTransparentAreas(background.path);
+        
+        // Set MAX_PHOTOS based on number of transparent areas, fallback to 7
+        if (transparentAreas.length > 0) {
+            MAX_PHOTOS = transparentAreas.length;
+        } else {
+            MAX_PHOTOS = 7; // Default fallback
+        }
+        
+        // Set background image for camera container
+        cameraContainer.style.backgroundImage = `url('${background.path}')`;
+        cameraContainer.style.backgroundSize = 'cover';
+        cameraContainer.style.backgroundPosition = 'center';
+        cameraContainer.style.backgroundAttachment = 'fixed';
+        
+        // Set background for photo strip
+        const photoStrip = document.getElementById('photoStripContainer');
+        if(photoStrip) {
+            photoStrip.style.backgroundImage = `url('${background.path}')`;
+            photoStrip.style.backgroundSize = 'cover';
+            photoStrip.style.backgroundPosition = 'center';
+            photoStrip.style.backgroundBlendMode = 'overlay';
+        }
+        
+        // Reset capture area index and position camera feed
+        currentCaptureAreaIndex = Math.min(capturedPhotos.length, transparentAreas.length - 1);
+        if (transparentAreas.length > 0) {
+            positionVideoInTransparentArea(currentCaptureAreaIndex);
+        } else {
+            // Reset to default fullscreen positioning
+            video.style.position = 'relative';
+            video.style.left = 'auto';
+            video.style.top = 'auto';
+            video.style.width = '100%';
+            video.style.height = '100%';
+        }
     }
-
-    updateBackgroundButtons(bg);
+    
+    updateBackgroundButtons(bgId);
 }
 
-function updateBackgroundButtons(bg) {
+// Position video element in transparent area
+function positionVideoInTransparentArea(areaIndex) {
+    if (areaIndex >= transparentAreas.length) return;
+    currentCaptureAreaIndex = areaIndex;
+    
+    const area = transparentAreas[areaIndex];
+    const containerRect = cameraContainer.getBoundingClientRect();
+    
+    // Calculate scale factor from image to container display size
+    const displayWidth = containerRect.width;
+    const displayHeight = containerRect.height;
+    
+    // Assume background is displayed as cover, calculate actual visible dimensions
+    const backgroundImg = new Image();
+    backgroundImg.onload = () => {
+        const imgAspect = backgroundImg.naturalWidth / backgroundImg.naturalHeight;
+        const containerAspect = displayWidth / displayHeight;
+        
+        let scaleX, scaleY, offsetX = 0, offsetY = 0;
+        
+        if (imgAspect > containerAspect) {
+            // Image is wider, crop sides
+            scaleY = displayHeight / backgroundImg.naturalHeight;
+            scaleX = scaleY;
+            offsetX = (displayWidth - backgroundImg.naturalWidth * scaleX) / 2;
+        } else {
+            // Image is taller, crop top/bottom
+            scaleX = displayWidth / backgroundImg.naturalWidth;
+            scaleY = scaleX;
+            offsetY = (displayHeight - backgroundImg.naturalHeight * scaleY) / 2;
+        }
+        
+        // Position and size video
+        const videoX = area.x * scaleX + offsetX;
+        const videoY = area.y * scaleY + offsetY;
+        const videoWidth = area.width * scaleX;
+        const videoHeight = area.height * scaleY;
+        
+        video.style.position = 'absolute';
+        video.style.left = videoX + 'px';
+        video.style.top = videoY + 'px';
+        video.style.width = videoWidth + 'px';
+        video.style.height = videoHeight + 'px';
+        video.style.objectFit = 'cover';
+        video.style.borderRadius = '0px';
+    };
+    backgroundImg.src = currentBackgroundImage;
+}
+
+function updateBackgroundButtons(bgId) {
     document.querySelectorAll('.background-btn').forEach(btn => {
-        if(btn.dataset.bg === bg) {
+        if(btn.dataset.bg === bgId) {
             btn.classList.add('active');
         } else {
             btn.classList.remove('active');
         }
+    });
+}
+
+// Render background buttons dynamically
+function renderBackgroundButtons() {
+    const backgroundsContainer = document.getElementById('backgroundsContainer');
+    if (!backgroundsContainer) return;
+    
+    backgroundsContainer.innerHTML = '';
+    
+    availableBackgrounds.forEach(bg => {
+        const button = document.createElement('button');
+        button.className = 'background-btn';
+        button.dataset.bg = bg.id;
+        button.title = bg.name;
+        button.onclick = () => changeBackground(bg.id);
+        
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'background-thumb';
+        thumbnail.src = bg.thumbnail;
+        thumbnail.alt = bg.name;
+        
+        button.appendChild(thumbnail);
+        backgroundsContainer.appendChild(button);
     });
 }
 
@@ -1017,26 +1242,48 @@ function toggleDraw(button) {
 // DRAW SYSTEM
 // ============================
 
-drawingCanvas.width = 700;
-
-drawingCanvas.height = 900;
+// Remove hardcoded dimensions - they will be set by initializeDrawingCanvas()
 
 drawingCanvas.addEventListener('pointerdown', (e) => {
     if (!drawEnabled) return;
+    e.preventDefault();
     drawing = true;
     hasDrawings = false;
     const rect = drawingCanvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     ctx.beginPath();
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = drawColor;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = drawColor;
     ctx.moveTo(x, y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    if (e.pointerId !== undefined && drawingCanvas.setPointerCapture) {
+        drawingCanvas.setPointerCapture(e.pointerId);
+    }
 });
 
-drawingCanvas.addEventListener('pointerup', () => {
+drawingCanvas.addEventListener('pointerup', (e) => {
+    if (e.pointerId !== undefined && drawingCanvas.releasePointerCapture) {
+        try { drawingCanvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
     finishDrawing();
 });
 
-drawingCanvas.addEventListener('pointerleave', () => {
+drawingCanvas.addEventListener('pointercancel', (e) => {
+    if (e.pointerId !== undefined && drawingCanvas.releasePointerCapture) {
+        try { drawingCanvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    finishDrawing();
+});
+
+drawingCanvas.addEventListener('pointerleave', (e) => {
+    if (!drawing) return;
     finishDrawing();
 });
 

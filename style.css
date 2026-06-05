@@ -444,7 +444,9 @@ button:hover{
 
     max-width:620px;
 
-    height:800px;
+    aspect-ratio:1 / 1;
+
+    height:auto;
 
     position:relative;
 
@@ -464,17 +466,12 @@ button:hover{
 }
 
 #cameraFeed{
-
     width:100%;
-
     height:100%;
-
     object-fit:cover;
-
     transform:scaleX(-1);
-
-    animation:
-    pulseGlow 3s infinite;
+    animation: pulseGlow 3s infinite;
+    display:block;
 }
 
 
@@ -518,6 +515,10 @@ button:hover{
 
     height:100%;
 
+    touch-action:none;
+
+    user-select:none;
+
     z-index:30;
 }
 
@@ -545,6 +546,12 @@ button:hover{
     z-index:50;
 
     opacity:0;
+
+    color:white;
+
+    text-shadow: 0 0 18px rgba(0,0,0,0.8);
+
+    visibility:hidden;
 
     pointer-events:none;
 }
@@ -731,6 +738,8 @@ button:hover{
     height:100%;
     border-radius:8px;
     box-shadow:inset 0 0 12px rgba(0,0,0,0.25);
+    object-fit:cover;
+    display:block;
 }
 
 /* Layout polish */
@@ -980,7 +989,8 @@ button:hover{
     #cameraContainer{
         width:100%;
         max-width:430px;
-        height:620px;
+        aspect-ratio:1 / 1;
+        height:auto;
     }
 
     .hero-title{
@@ -992,7 +1002,9 @@ button:hover{
 @media(max-width:600px){
 
     #cameraContainer{
-        height:520px;
+        max-width:100%;
+        aspect-ratio:1 / 1;
+        height:auto;
     }
 
     .hero-title{
@@ -1027,3 +1039,4 @@ button:hover{
         font-size:80px;
     }
 }
+
